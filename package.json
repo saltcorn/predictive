@@ -1,0 +1,28 @@
+{
+  "name": "@saltcorn/predictive",
+  "version": "0.1.0",
+  "description": "Predictive analytics and machine learning module based on Smartcore",
+  "main": "index.js",
+  "dependencies": {
+    "@saltcorn/markup": "^1.2.0",
+    "@saltcorn/data": "^1.2.0"
+  },
+  "author": "Tom Nielsen",
+  "license": "MIT",
+  "eslintConfig": {
+    "extends": "eslint:recommended",
+    "parserOptions": {
+      "ecmaVersion": 2020
+    },
+    "env": {
+      "node": true,
+      "es6": true
+    },
+    "rules": {
+      "no-unused-vars": "off",
+      "no-case-declarations": "off",
+      "no-empty": "warn",
+      "no-fallthrough": "warn"
+    }
+  }
+}
