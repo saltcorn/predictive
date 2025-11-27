@@ -148,7 +148,37 @@ const configuration_workflow = (req) =>
                     "Custom Python Code",
                   ],
                 },
-              },              
+              },
+            ],
+          });
+        },
+      },
+      {
+        name: "Preprocessing steps",
+        form: async (context) => {
+          const table = await Table.findOne(
+            context.table_id
+              ? { id: context.table_id }
+              : { name: context.exttable_name }
+          );
+          //console.log(context);
+          const field_options = table.fields.filter((f) =>
+            ["Float", "Int"].includes(f.type?.name)
+          );
+          return new Form({
+            fields: [
+              new FieldRepeat({
+                name: "preprocessors",
+                fields: [
+                  {
+                    name: "preproctype",
+                    label: "Type",
+                    type: "String",
+                    required: true,
+                    attributes: { options: ["Standard scaler", "PCA"] },
+                  },
+                ],
+              }),
             ],
           });
         },
@@ -156,13 +186,11 @@ const configuration_workflow = (req) =>
     ],
   });
 
-let regr_pred_code = get_predictor(path.join(__dirname, "Regression.ipynb"));
-
 module.exports = {
   sc_plugin_api_version: 1,
-  plugin_name: "sklearn-regression",
+  plugin_name: "predictive",
   modelpatterns: {
-    RegressionModel: {
+    SupervisedPredictionModel: {
       configuration_workflow,
       hyperparameter_fields: ({ table, configuration }) => {
         switch (configuration?.regression_model) {
