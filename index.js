@@ -439,3 +439,68 @@ module.exports = {
     },
   },
 };
+function calcr2(y, f) {
+  let sum = 0;
+  for (let i = 0; i < y.length; i++) {
+    sum += y[i];
+  }
+  let ymean = sum / y.length;
+  let ssres = 0,
+    sstot = 0;
+  for (let i = 0; i < y.length; i++) {
+    sstot += Math.pow(y[i] - ymean, 2);
+    ssres += Math.pow(y[i] - f[i], 2);
+  }
+
+  return 1 - ssres / sstot;
+}
+const rows_to_df = ({ rows, configuration, table }) => {
+  const float_columns = [];
+  const cols = configuration.columns.map((c) => {
+    if (c.type !== "Field") return c;
+    const field = table.getField(c.field_name);
+    const isBool = field?.type?.name === "Bool";
+    if (!isBool) float_columns.push(c.field_name);
+    let maxDims;
+    if (field.type.name === "FloatArray") {
+      const dims = rows.map((r) => r[c.field_name].length);
+      maxDims = Math.max(...dims);
+    }
+
+    return { field, maxDims, isBool, ...c };
+  });
+  const df = new DataFrame(
+    rows.map((r) => {
+      const o = {};
+      cols.forEach((c) => {
+        switch (c.type) {
+          case "FormulaValue":
+            o[c.field_name] = eval_expression(c.formula, r);
+            break;
+          case "Field":
+            if (c.field.type.name === "FloatArray") {
+              for (let i = 0; i < c.maxDims; i++)
+                o[c.field_name + i] = r[c.field_name][i];
+            } else if (c.field.type.name === "PGVector") {
+              const v = JSON.parse(r[c.field_name]);
+              const dims = v.length;
+              for (let i = 0; i < dims; i++) {
+                o[c.field_name + i] = v[i];
+              }
+            } else {
+              o[c.field_name] = c.isBool
+                ? r[c.field_name]
+                  ? 1.0
+                  : 0.0
+                : r[c.field_name];
+            }
+            break;
+          default:
+            break;
+        }
+      });
+      return o;
+    })
+  );
+  return { df, float_columns };
+};
