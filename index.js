@@ -403,17 +403,36 @@ module.exports = {
         });
         const y_key = configuration.outcome_field;
         // console.log('Selected: ', columns)
+        let predictor;
+        switch (configuration.regression_model) {
+          case "Ridge":
+            predictor = new RidgeRegression({
+              alpha: hyperparameters.regularization,
+            });
+            break;
 
-        let pipe = makePipeline(
-          [
-            //new StandardScaler(),
-            new PCA({ nComponents: 3, columns: float_columns }),
-            new RidgeRegression({ alpha: hyperparameters.regularization }),
-          ],
-          {
-            verbose: true,
+          default:
+            break;
+        }
+        let preprocessors = [];
+        configuration.preprocessors.forEach((prep) => {
+          switch (prep.preproctype) {
+            case "PCA":
+              preprocessors.push(
+                new PCA({
+                  nComponents: prep.pca_ncomponents,
+                  columns: float_columns,
+                })
+              );
+              break;
+
+            default:
+              break;
           }
-        );
+        });
+        let pipe = makePipeline([...preprocessors, predictor], {
+          verbose: true,
+        });
         const y = new Float64Array(rows.map((r) => r[y_key]));
 
         pipe.fit(df, y);
