@@ -36,6 +36,44 @@ const {
   tbody,
 } = require("@saltcorn/markup/tags");
 
+const {
+  linearModel,
+  preprocessing,
+  dataset,
+  ensemble,
+  modelSelection,
+  metrics,
+  pipeline,
+  cluster,
+  decomposition,
+  naiveBayes,
+  neighbors,
+  dataFrame,
+  coreBindings,
+} = require("@saltcorn/smartcore-js");
+let { RidgeRegressionF64F64 } = coreBindings;
+
+let {
+  LogisticRegression,
+  LinearRegression,
+  RidgeRegression,
+  Lasso,
+  ElasticNet,
+} = linearModel;
+let { RandomForestClassifier, RandomForestRegressor, ExtraTreesRegressor } =
+  ensemble;
+let { StandardScaler, OneHotEncoder } = preprocessing;
+let { KMeans, DBSCAN } = cluster;
+let { PCA, SVD } = decomposition;
+let { BernoulliNB, CategoricalNB, GaussianNB, MultinomialNB } = naiveBayes;
+let { KNNClassifier, KNNRegressor } = neighbors;
+let { loadIris, loadBoston, loadBreastCancer, loadDiabetes, loadDigits } =
+  dataset;
+let { trainTestSplit } = modelSelection;
+let { accuracyScore, DistanceType } = metrics;
+let { makePipeline } = pipeline;
+const { DataFrame } = dataFrame;
+
 const configuration_workflow = (req) =>
   new Workflow({
     steps: [
@@ -145,7 +183,6 @@ const configuration_workflow = (req) =>
                     "Random Forest",
                     "Support Vector Machine",
                     "Partial Least Squares",
-                    "Custom Python Code",
                   ],
                 },
               },
@@ -176,6 +213,21 @@ const configuration_workflow = (req) =>
                     type: "String",
                     required: true,
                     attributes: { options: ["Standard scaler", "PCA"] },
+                  },
+                  {
+                    name: "pca_ncomponents",
+                    label: "Number of components",
+                    type: "Integer",
+                    required: true,
+                    showIf: { preproctype: "PCA" },
+                  },
+                  {
+                    name: "pca_columns",
+                    label: "Predictors to include in PCA",
+                    type: "String",
+                    sublabel:
+                      "Comma separated list of variable names. Leave blank to transform all predictors",
+                    showIf: { preproctype: "PCA" },
                   },
                 ],
               }),
@@ -344,40 +396,44 @@ module.exports = {
         });
         console.log("writing csv");
 
-        await write_csv(
+        const { df, float_columns } = rows_to_df({
           rows,
-          [...columns, { type: "Field", field_name: outcome_field }],
-          fields,
-          "/tmp/scdata.csv"
-        );
-        console.log("running model");
-
-        return await run_jupyter_model({
           configuration,
-          hyperparameters,
-          csvPath: "/tmp/scdata.csv",
-          ipynbPath: path.join(__dirname, "Regression.ipynb"),
+          table,
         });
+        const y_key = configuration.outcome_field;
+        // console.log('Selected: ', columns)
+
+        let pipe = makePipeline(
+          [
+            //new StandardScaler(),
+            new PCA({ nComponents: 3, columns: float_columns }),
+            new RidgeRegression({ alpha: hyperparameters.regularization }),
+          ],
+          {
+            verbose: true,
+          }
+        );
+        const y = new Float64Array(rows.map((r) => r[y_key]));
+
+        pipe.fit(df, y);
+        let score = calcr2(pipe.predict(df), y);
+
+        const fit_object = serialisePipe(pipe);
+        return { fit_object, metric_values: { R2: score } };
       },
       predict: async ({
         id, //instance id
-        model: {
-          configuration: { columns, outcome_field },
-          table_id,
-        },
+        model: { configuration, table_id },
         hyperparameters,
         fit_object,
         rows,
       }) => {
-        await fsp.writeFile("/tmp/scanomallymodel" + id, fit_object);
-        const table = Table.findOne({ id: table_id });
-        const rnd = Math.round(Math.random() * 10000);
-        await write_csv(rows, columns, table.fields, `/tmp/scdata${rnd}.csv`);
-        await eval("python.ex`" + regr_pred_code + "`");
-        const predicts =
-          await python`predict('/tmp/scanomallymodel'+str(${id}), ${`/tmp/scdata${rnd}.csv`})`;
-        return rows.map((r, ix) => ({
-          [`${outcome_field}_prediction`]: predicts.yhat[ix],
+        const pipe = deserialisePipe(fit_object);
+        const { df } = rows_to_df({ rows, configuration, table });
+        const yhats = Array.from(pipe.predict(df));
+        return yhats.map((yhat) => ({
+          [`${configuration.outcome_field}_prediction`]: yhat,
         }));
       },
     },
