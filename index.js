@@ -71,7 +71,7 @@ let { loadIris, loadBoston, loadBreastCancer, loadDiabetes, loadDigits } =
   dataset;
 let { trainTestSplit } = modelSelection;
 let { accuracyScore, DistanceType } = metrics;
-let { makePipeline } = pipeline;
+let { makePipeline, deserializePipeline } = pipeline;
 const { DataFrame } = dataFrame;
 
 const configuration_workflow = (req) =>
@@ -438,7 +438,7 @@ module.exports = {
         pipe.fit(df, y);
         let score = calcr2(pipe.predict(df), y);
 
-        const fit_object = serialisePipe(pipe);
+        const fit_object = pipe.serialize();
         return { fit_object, metric_values: { R2: score } };
       },
       predict: async ({
@@ -448,7 +448,7 @@ module.exports = {
         fit_object,
         rows,
       }) => {
-        const pipe = deserialisePipe(fit_object);
+        const pipe = deserializePipeline(fit_object);
         const { df } = rows_to_df({ rows, configuration, table });
         const yhats = Array.from(pipe.predict(df));
         return yhats.map((yhat) => ({
