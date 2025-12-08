@@ -6,7 +6,7 @@
   "dependencies": {
     "@saltcorn/markup": "^1.2.0",
     "@saltcorn/data": "^1.2.0",
-    "@saltcorn/smartcore-js": "0.2.11"
+    "@saltcorn/smartcore-js": "0.2.18"
   },
   "author": "Tom Nielsen",
   "license": "MIT",
